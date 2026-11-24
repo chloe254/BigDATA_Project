@@ -1,0 +1,15 @@
+[project]
+name = "bigdata-project"
+version = "0.1.0"
+description = "ATP tennis: does the court surface change who wins? Medallion pipeline on Onyxia (S3, Spark, Iceberg, DuckDB)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pyspark>=4.1,<4.2",
+    "duckdb>=1.3",
+    "pandas>=2.2",
+    "pyarrow>=17",
+]
+
+[tool.uv]
+package = false
