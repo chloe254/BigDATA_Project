@@ -1,0 +1,11 @@
+rule,n_rows,pct,example
+"duplicate key (tourney_id, match_num), all copies counted",0,0.0,""
+walkover (score = W/O),99,0.68,Munich 20210426 | Filip Krajinovic d. Yannick Hanfmann | score=W/O
+retirement or default (RET/DEF),405,2.76,Munich 20210426 | Guido Pella d. Egor Gerasimov | score=6-0 2-0 RET
+surface missing or not Hard/Clay/Grass,53,0.36,Davis Cup WG1 PO: BRA vs CHN 20230203 | Matheus Pucinelli De Almeida d. Rigele Te | score=6-1 6-2
+winner_rank or loser_rank missing,203,1.39,Doha 20210308 | Aslan Karatsev d. Mubarak Shannan Zayid | score=6-4 6-0
+serve stats missing (w_svpt or l_svpt),759,5.18,Tokyo Olympics 20210724 | Frances Tiafoe d. Soon Woo Kwon | score=6-3 6-2
+"serve stats inconsistent (1stIn > svpt, 1stWon > 1stIn, bpSaved > bpFaced...)",15,0.1,Adelaide 20250106 | Sebastian Korda d. Thanasi Kokkinakis | score=W/O
+minutes missing,1231,8.4,Tokyo Olympics 20210724 | Frances Tiafoe d. Soon Woo Kwon | score=6-3 6-2
+minutes outlier (<= 0 or > 400),53,0.36,Munich 20210426 | Filip Krajinovic d. Yannick Hanfmann | score=W/O
+winner_ht or loser_ht missing,273,1.86,Doha 20210308 | Aslan Karatsev d. Mubarak Shannan Zayid | score=6-4 6-0
