@@ -1,0 +1,77 @@
+# Ingestion inside the cluster: download from the source and write to the bronze layer.
+# Why not the ConfigMap of the course lab? A ConfigMap is limited to 1 MiB and our raw data is 1-5 MB:
+# the Job reads the source system directly, like a real ingestion.
+#
+# Prerequisites (from the vscode-pyspark terminal, as in the S3 lab):
+#   kubectl create configmap s3-config \
+#     --from-literal=AWS_ENDPOINT_URL="$S3_ENDPOINT_URL" \
+#     --from-literal=AWS_DEFAULT_REGION="$(aws configure get region --profile default)" \
+#     --from-literal=DATA_ROOT="s3://$KUBERNETES_NAMESPACE/bigdata_project" \
+#     --dry-run=client -o yaml | kubectl apply -f -
+#   aws configure export-credentials --profile default --format env-no-export \
+#     | grep -E '^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)=' > s3.env
+#   kubectl create secret generic s3-credentials --from-env-file=s3.env --dry-run=client -o yaml | kubectl apply -f -
+#   rm s3.env
+# Run:
+#   kubectl delete job atp-upload-bronze --ignore-not-found && kubectl apply -f k8s/job-upload-bronze.yaml
+#   kubectl wait --for=condition=complete job/atp-upload-bronze --timeout=300s
+#   kubectl logs job/atp-upload-bronze          # <- execution trace for the evidence folder
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: atp-upload-bronze
+  labels:
+    app: bigdata-project
+    layer: bronze
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: bigdata-project
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: upload
+          image: amazon/aws-cli:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "start: $(date -u +%Y-%m-%dT%H:%M:%SZ) namespace: $POD_NAMESPACE"
+              mkdir -p /tmp/raw && cd /tmp/raw
+              for s in $SEASONS; do
+                curl -fsSL "$SOURCE_URL/atp_matches_$s.csv" -o "atp_matches_$s.csv"
+              done
+              total=$(cat atp_matches_*.csv | wc -c)
+              echo "total raw bytes: $total"
+              if [ "$total" -lt 1000000 ] || [ "$total" -gt 5000000 ]; then
+                echo "raw size out of the 1-5 MB range" >&2; exit 1
+              fi
+              { echo "source=$SOURCE_URL"; echo "downloaded_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)";
+                echo "seasons=$SEASONS"; echo "total_bytes=$total"; sha256sum atp_matches_*.csv; } > MANIFEST.txt
+              aws s3 cp /tmp/raw/ "$DATA_ROOT/bronze/atp/" --recursive
+              aws s3 ls "$DATA_ROOT/bronze/atp/" --human-readable --summarize
+              echo "end: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          env:
+            - name: SOURCE_URL
+              value: https://huggingface.co/datasets/Aneeshers/tennis-sackmann-archive/resolve/main/atp
+            - name: SEASONS
+              value: "2021 2022 2023 2024 2025"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          envFrom:
+            - configMapRef:
+                name: s3-config
+            - secretRef:
+                name: s3-credentials
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
