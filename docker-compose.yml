@@ -1,0 +1,31 @@
+# Local S3 (MinIO) to develop while the Onyxia cluster is unavailable.
+#   docker compose up -d          -> API http://localhost:9000, console http://localhost:9001 (minio / minio12345)
+# The bucket "bigdata-project" is created automatically.
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio12345
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 10
+
+  create-bucket:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "mc alias set local http://minio:9000 minio minio12345 &&
+             mc mb --ignore-existing local/bigdata-project"
+
+volumes:
+  minio-data:
