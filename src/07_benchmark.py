@@ -3,92 +3,94 @@ import time
 
 from config import SILVER, bronze_files, get_duckdb, get_spark, spark_path
 
-RUNS = 3
+REPETITIONS = 3
 
 t = time.perf_counter()
 spark = get_spark("atp-benchmark")
-spark_startup = time.perf_counter() - t
+demarrage_spark = time.perf_counter() - t
 con = get_duckdb()
 
-csv_files = bronze_files()
-parquet_dir = SILVER + "/atp_matches"
-csv_list = ", ".join(f"'{f}'" for f in csv_files)
+fichiers_csv = bronze_files()
+dossier_parquet = SILVER + "/atp_matches"
+liste_csv = ", ".join(f"'{f}'" for f in fichiers_csv)
 
-QUERY = """
-SELECT surface, COUNT(*) AS matches, ROUND(AVG(TRY_CAST(minutes AS DOUBLE)), 1) AS avg_minutes
-FROM {src}
+REQUETE = """
+SELECT surface, COUNT(*) AS matchs, ROUND(AVG(TRY_CAST(minutes AS DOUBLE)), 1) AS duree_moyenne
+FROM {source}
 WHERE surface IN ('Hard', 'Clay', 'Grass')
 GROUP BY surface ORDER BY surface"""
 
 
 def spark_csv():
-    (spark.read.option("header", True).csv([spark_path(f) for f in csv_files])
+    (spark.read.option("header", True).csv([spark_path(f) for f in fichiers_csv])
      .createOrReplaceTempView("bench_csv"))
-    return [tuple(r) for r in spark.sql(QUERY.format(src="bench_csv")).collect()]
+    return [tuple(r) for r in spark.sql(REQUETE.format(source="bench_csv")).collect()]
 
 
 def spark_parquet():
-    spark.read.parquet(spark_path(parquet_dir)).createOrReplaceTempView("bench_parquet")
-    return [tuple(r) for r in spark.sql(QUERY.format(src="bench_parquet")).collect()]
+    spark.read.parquet(spark_path(dossier_parquet)).createOrReplaceTempView("bench_parquet")
+    return [tuple(r) for r in spark.sql(REQUETE.format(source="bench_parquet")).collect()]
 
 
 def duckdb_csv():
-    src = f"read_csv([{csv_list}], header = true, all_varchar = true)"
-    return con.execute(QUERY.format(src=src)).fetchall()
+    source = f"read_csv([{liste_csv}], header = true, all_varchar = true)"
+    return con.execute(REQUETE.format(source=source)).fetchall()
 
 
 def duckdb_parquet():
-    src = f"read_parquet('{parquet_dir}/*/*.parquet', hive_partitioning = true)"
-    return con.execute(QUERY.format(src=src)).fetchall()
+    source = f"read_parquet('{dossier_parquet}/*/*.parquet', hive_partitioning = true)"
+    return con.execute(REQUETE.format(source=source)).fetchall()
 
 
-def measure(fn):
-    result = fn()
-    times = []
-    for _ in range(RUNS):
+def mesurer(fonction):
+    resultat = fonction()
+    durees = []
+    for _ in range(REPETITIONS):
         t = time.perf_counter()
-        fn()
-        times.append(time.perf_counter() - t)
-    return statistics.median(times), result
+        fonction()
+        durees.append(time.perf_counter() - t)
+    return statistics.median(durees), resultat
 
 
-def size_bytes(paths):
+def taille_octets(chemins):
     jvm = spark._jvm
     conf = spark._jsc.hadoopConfiguration()
     total = 0
-    for p in paths:
-        path = jvm.org.apache.hadoop.fs.Path(spark_path(p))
-        total += path.getFileSystem(conf).getContentSummary(path).getLength()
+    for c in chemins:
+        chemin = jvm.org.apache.hadoop.fs.Path(spark_path(c))
+        total += chemin.getFileSystem(conf).getContentSummary(chemin).getLength()
     return total
 
 
-rows = []
-results = {}
-for engine, fmt, fn in (("Spark", "CSV (bronze)", spark_csv),
-                        ("Spark", "Parquet (silver)", spark_parquet),
-                        ("DuckDB", "CSV (bronze)", duckdb_csv),
-                        ("DuckDB", "Parquet (silver)", duckdb_parquet)):
-    seconds, result = measure(fn)
-    results[(engine, fmt)] = [(r[0], int(r[1])) for r in result]
-    rows.append((engine, fmt, seconds))
+mesures = []
+resultats = {}
+for moteur, format_, fonction in (("Spark", "CSV (bronze)", spark_csv),
+                                  ("Spark", "Parquet (silver)", spark_parquet),
+                                  ("DuckDB", "CSV (bronze)", duckdb_csv),
+                                  ("DuckDB", "Parquet (silver)", duckdb_parquet)):
+    secondes, resultat = mesurer(fonction)
+    resultats[(moteur, format_)] = [(r[0], int(r[1])) for r in resultat]
+    mesures.append((moteur, format_, secondes))
 
-csv_size = size_bytes(csv_files)
-parquet_size = size_bytes([parquet_dir])
+taille_csv = taille_octets(fichiers_csv)
+taille_parquet = taille_octets([dossier_parquet])
 
-print(f"\nQuery: matches and average duration per surface (median of {RUNS} runs after 1 warm-up)")
-print(f"{'engine':<8} {'format':<18} {'seconds':>8}")
-for engine, fmt, seconds in rows:
-    print(f"{engine:<8} {fmt:<18} {seconds:>8.3f}")
-print(f"\nSpark session startup : {spark_startup:.1f} s (paid once per job, not by DuckDB)")
-print(f"\nStorage   CSV bronze     : {csv_size / 1e6:.2f} MB")
-print(f"          Parquet silver : {parquet_size / 1e6:.2f} MB "
-      f"({100 * parquet_size / csv_size:.0f}% of CSV, typed, partitioned by surface)")
+print(f"\nRequête : nombre de matchs et durée moyenne par surface "
+      f"(médiane de {REPETITIONS} exécutions après 1 passage à blanc)")
+print(f"{'moteur':<8} {'format':<18} {'secondes':>8}")
+for moteur, format_, secondes in mesures:
+    print(f"{moteur:<8} {format_:<18} {secondes:>8.3f}")
+print(f"\nDémarrage de la session Spark : {demarrage_spark:.1f} s "
+      "(payé une fois par job, inexistant avec DuckDB)")
+print(f"\nStockage   CSV bronze     : {taille_csv / 1e6:.2f} Mo")
+print(f"           Parquet silver : {taille_parquet / 1e6:.2f} Mo "
+      f"({100 * taille_parquet / taille_csv:.0f} % du CSV, typé, partitionné par surface)")
 
-csv_counts = results[("DuckDB", "CSV (bronze)")]
-pq_counts = results[("DuckDB", "Parquet (silver)")]
-same_engine = all(results[("Spark", f)] == results[("DuckDB", f)]
-                  for f in ("CSV (bronze)", "Parquet (silver)"))
-print(f"\nSame result Spark vs DuckDB on each format : {same_engine}")
-print(f"Bronze vs silver counts per surface        : {csv_counts} -> {pq_counts}"
-      " (gap = walkovers removed in silver)")
+comptes_csv = resultats[("DuckDB", "CSV (bronze)")]
+comptes_parquet = resultats[("DuckDB", "Parquet (silver)")]
+memes_resultats = all(resultats[("Spark", f)] == resultats[("DuckDB", f)]
+                      for f in ("CSV (bronze)", "Parquet (silver)"))
+print(f"\nMême résultat Spark et DuckDB sur chaque format : {'OUI' if memes_resultats else 'NON'}")
+print(f"Matchs par surface, bronze -> silver            : {comptes_csv} -> {comptes_parquet}"
+      " (écart = forfaits retirés dans le silver)")
 spark.stop()

@@ -13,6 +13,6 @@ Tip: before each capture, run `echo "$KUBERNETES_NAMESPACE - $(date)"` in the te
 | `06_spark_ui.png` | Spark UI (jobs / stages / DAG) during a run | port 4040 of the service |
 | `07_spark_gold.png` | Gold tables printed | `uv run python src/05_silver_to_gold.py` |
 | `08_s3_processed.png` | Silver (Iceberg: data + metadata) and gold prefixes | `aws s3 ls $DATA_ROOT/ --recursive --human-readable` |
-| `09_verification.png` | "VERIFICATION PASSED" | `uv run python src/06_verify_duckdb.py` |
+| `09_verification.png` | "VERIFICATION REUSSIE" | `uv run python src/06_verify_duckdb.py` |
 | `10_benchmark.png` | Spark vs DuckDB, CSV vs Parquet | `uv run python src/07_benchmark.py` |
 | `11_s3_browser.png` | Onyxia file explorer showing the bucket | Onyxia portal > Mes fichiers |
