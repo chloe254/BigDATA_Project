@@ -1,0 +1,28 @@
+# Raw data is stored on S3, never in Git
+data/
+data_lake/
+*.csv
+!src/**/*.csv
+!docs/*.csv
+
+# Secrets
+.env
+s3.env
+*.credentials
+
+# Python / uv
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Spark / Iceberg local artefacts
+spark-warehouse/
+metastore_db/
+derby.log
+.spark-ivy/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
