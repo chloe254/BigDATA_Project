@@ -10,7 +10,7 @@ import os
 
 DATA_ROOT = os.environ.get("DATA_ROOT", "./data_lake").rstrip("/")
 IS_S3 = DATA_ROOT.startswith("s3://")
-USE_ICEBERG = os.environ.get("USE_ICEBERG", "1") == "1"
+USE_ICEBERG = os.environ.get("USE_ICEBERG", "0") == "1"
 ICEBERG_PACKAGE = os.environ.get(
     "ICEBERG_PACKAGE", "org.apache.iceberg:iceberg-spark-runtime-4.1_2.13:1.11.0"
 )

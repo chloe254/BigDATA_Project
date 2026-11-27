@@ -31,7 +31,7 @@ if [[ -z "${SCRIPTS[$ETAPE_DEPART]:-}" ]]; then
 fi
 
 echo "Pipeline ATP - namespace ${KUBERNETES_NAMESPACE:-local} - $(date)"
-echo "DATA_ROOT=$DATA_ROOT  USE_ICEBERG=${USE_ICEBERG:-1}  départ à l'étape $ETAPE_DEPART"
+echo "DATA_ROOT=$DATA_ROOT  USE_ICEBERG=${USE_ICEBERG:-0}  départ à l'étape $ETAPE_DEPART"
 
 debut_total=$SECONDS
 for etape in 3 4 5 6; do
